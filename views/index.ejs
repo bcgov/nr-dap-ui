@@ -1,0 +1,29 @@
+<!-- views/index.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <%- include('./partials/header') %>
+    <h1>Welcome to the DAP Client Management System</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>    <p>Hello: <%= user.name %></p></th>
+
+            </tr>
+        </thead>
+        <tbody>
+                <tr>
+                    <td>    <a href="/appList">Go to Data Auto Extraction Tool. </a>You can use the this system to extract data from different sources. Before you proceed, please contact Data Foundation Team at NRM.DataFoundation@gov.bc.ca to help us get access to your data.</td>
+                </tr>
+        </tbody>
+    </table>
+
+    <%- include('./partials/footer') %>
+</body>
+</html>

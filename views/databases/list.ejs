@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>List of Databases</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <%- include('../partials/header', { title: 'Database Management' }) %>
+    <h1>Databases</h1>
+    <a href="/databases/add">Add New Database</a>
+    <table>
+        <thead>
+            <tr>
+                <th>Database Name</th>
+                <th>Application Name</th>
+                <th>Vault Secret Name</th>
+                <th>Schema Name</th>
+                <th>Owner</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% databases.forEach(database => { %>
+                <tr>
+                    <td><%= database.databasename %></td>
+                    <td><%= database.applicationname %></td>
+                    <td><%= database.vaultname %></td>
+                    <td><%= database.schemaname %></td>
+                    <td><%= database.ownerusername %></td>
+                    <td>
+                        <form method="post" action="/databases/delete/<%= database.databaseid %>" onsubmit="return confirm('Are you sure you want to delete this database?');">
+                            <a href="/databases/edit/<%= database.databaseid %>" class="edit-link">Edit</a>
+                            <button type="submit" class="button-del">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            <% }) %>
+        </tbody>
+    </table>
+    <%- include('../partials/footer') %>
+</body>
+</html>

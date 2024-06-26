@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Database</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <%- include('../partials/header', { title: 'Edit Database' }) %>
+    <h1>Edit Database</h1>
+    <form method="post" action="/databases/edit/<%= database.databaseid %>">
+        <label for="databasename">Database Name:</label>
+        <input type="text" id="databasename" name="databasename" value="<%= database.databasename %>" required><br>
+
+        <label for="applicationname">Application Name:</label>
+        <input type="text" id="applicationname" name="applicationname" value="<%= database.applicationname %>" required><br>
+
+        <label for="vaultname">Vault Name:</label>
+        <input type="text" id="vaultname" name="vaultname" value="<%= database.vaultname %>" required><br>
+
+        <label for="schemaname">Schema Name:</label>
+        <input type="text" id="schemaname" name="schemaname" value="<%= database.schemaname %>" required><br>
+
+        <label for="owneruserid">Owner User:</label>
+        <select id="owneruserid" name="owneruserid">
+            <% users.forEach(user => { %>
+                <option value="<%= user.userid %>" <%= user.userid === database.owneruserid ? 'selected' : '' %>><%= user.username %></pre>
+            <% }) %>
+        </select><br>
+
+        <button type="submit">Update Database</button>
+    </form>
+    <%- include('../partials/footer') %>
+</body>
+</html>
