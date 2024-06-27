@@ -17,32 +17,14 @@ DAPUI is designed to streamline the management of data access requests and extra
 ## Getting Started
 
 To get started with DAPUI, follow the instructions below to set up your development environment and run the application locally.
-Create a file name keycloak.json.
-1. **Create keycloak.json file and edit it**:
+Create a file name .env for environment variables.
+1. **Create .env file and edit it**:
    ```sh
-        {
-            "realm": "standard",
-            "auth-server-url": "https://loginproxy.gov.bc.ca/auth",
-            "ssl-required": "external",
-            "resource": "dap-data-extraction-tool-5457",
-            "credentials": {
-                "secret": "YOUR SECRET"
-            },
-            "confidential-port": 0,
-            "public-client": false
-        }
-Edit the secret key in keycloak.json.
+KEYCLOAK_SECRET=CHANG TO YOUR SECRET
+CONFIG_BROKER_JWT=CHANG TO YOUR SECRET
+CONFIG_VAULT_ENV=dev
 
-2. **Create modules/config.json**
-   ```sh
-    {
-        "brokerUrl": "https://nr-broker.apps.silver.devops.gov.bc.ca",
-        "brokerJwt": "YOUR SECRET",
-        "vaultUrl": "https://vault-iit.apps.silver.devops.gov.bc.ca",
-        "vaultEnv": "dev"
-    }
-
-Edit the secret key in config.json.
+Edit the secret key. KEYCLOAK_SECRET is for SSO. CONFIG_BROKER_JWT is for vault api key. CONFIG_VAULT_ENV can be dev or prd.
 
 ### Prerequisites
 
