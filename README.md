@@ -20,9 +20,9 @@ To get started with DAPUI, follow the instructions below to set up your developm
 Create a file name .env for environment variables.
 1. **Create .env file and edit it**:
    ```sh
-KEYCLOAK_SECRET=CHANG TO YOUR SECRET
-CONFIG_BROKER_JWT=CHANG TO YOUR SECRET
-CONFIG_VAULT_ENV=dev
+    KEYCLOAK_SECRET=CHANG TO YOUR SECRET
+    CONFIG_BROKER_JWT=CHANG TO YOUR SECRET
+    CONFIG_VAULT_ENV=dev
 
 Edit the secret key. KEYCLOAK_SECRET is for SSO. CONFIG_BROKER_JWT is for vault api key. CONFIG_VAULT_ENV can be dev or prd.
 
