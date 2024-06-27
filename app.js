@@ -1,7 +1,9 @@
 const express = require('express');
+require('dotenv').config();
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const Keycloak = require('keycloak-connect');
+const keycloakConfig = require('./keycloak');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
@@ -23,7 +25,7 @@ const automationRouter = require('./routes/automation');
 const databaseRouters = require('./routes/databaseRoutes');
 const appRouters = require('./routes/appRoutes');
 const memoryStore = new session.MemoryStore();
-const keycloak = new Keycloak({ store: memoryStore });
+const keycloak = new Keycloak({ store: memoryStore }, keycloakConfig);
 const dataTableRoutes = require('./routes/dataTableRoutes');
 
 

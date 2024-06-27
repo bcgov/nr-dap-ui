@@ -1,7 +1,8 @@
 const { getCredentialsFromVault } = require('./getCredentialsFromVault');
 const { connectToPosgDatabase } = require('./connectToPosgDatabase');
 const { connectToOracleDatabase } = require('./connectToOracleDatabase');
-const config = require('./config.json');
+// const config = require('./config.json');
+const config = require('./config');
 let credentials = null;
 async function connectDatabase(secretName) {
     try {
