@@ -27,8 +27,6 @@ const appRouters = require('./routes/appRoutes');
 const memoryStore = new session.MemoryStore();
 const keycloak = new Keycloak({ store: memoryStore }, keycloakConfig);
 const dataTableRoutes = require('./routes/dataTableRoutes');
-
-
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use(session({
@@ -70,7 +68,7 @@ async function checkAdminRole(req, res, next) {
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 //admin home page.
-app.get('/', keycloak.protect(), (req, res) => {
+app.get(['/', '/index'], keycloak.protect(), (req, res) => {
     res.render('index', { user: req.kauth.grant.access_token.content });
 });
 // Use routes

@@ -47,4 +47,4 @@ If you have any questions or need further assistance, please feel free to reach 
 
 ### Flow Chart
 
-![Flowchart](images/flowChart.jpg)
+![Flowchart](public/images/flowChart.jpg)
