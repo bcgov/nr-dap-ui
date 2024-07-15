@@ -10,7 +10,7 @@ async function connectDatabase(secretName) {
         let connection;
         if (credentials) {
             console.log("Successfully retrieved credentials:");
-            console.log(JSON.stringify(credentials, null, 2));
+            // console.log(JSON.stringify(credentials, null, 2));
             // switch connection
             if (credentials.data.dbtype === 'postgresql') {
                 return await connectToPosgDatabase(credentials);

@@ -11,6 +11,8 @@ const { connectToOracleDatabase } = require('../modules/connectToOracleDatabase'
 const { verifyUserEmail } = require('../modules/verifyUserEmail');
 const { getUserDetails } = require('../modules/getUserDetails');
 const { logUserVisit } = require('../modules/logUserVisit');
+const { triggerAirflowDAG } = require('../modules/triggerAirflow'); 
+
 const express = require('express');
 const oracledb = require('oracledb');
 const bodyParser = require('body-parser');
@@ -26,7 +28,7 @@ let sourceSchemaName = null;
 let applicationName = null;
 let selectedTables = null;
 let userEmail = null;
-let ODSdatabase = 'testlocal';
+let ODSdatabase = process.env.DATABASE_ODS_IN_VAULT;
 let pgClient;  // Client for PostgreSQL ODS Database
 let oracleConnection;  // Connection to Oracle Database
 
@@ -339,7 +341,9 @@ router.post('/generate-ddl', async (req, res) => {
             for (const tableName of selectedTables) {
                 await insertIntoDatatable(tableName, applicationName, userEmail);
             }
-    
+            console.log('Tables inserted cdc master table');
+            await triggerAirflowDAG('auto_dag_creation');  // Trigger the Airflow DAG
+            console.log('DAG triggered successfully.');
         } catch (error) {
             console.error('Failed to process request:', error);
             res.status(500).send('An error occurred during processing.');
