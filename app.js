@@ -52,7 +52,8 @@ async function checkAdminRole(req, res, next) {
     try {
         const pgClient = await connectDatabase(process.env.DATABASE_ODS_IN_VAULT); // Connect to PostgreSQL ODS Database using a specific identifier if needed
         const result = await pgClient.query('SELECT roleid FROM dapui."user" WHERE email = $1', [email]);
-        pgClient.release();  // Make sure to release the client after use
+        console.log(result); 
+        // pgClient.release();  // Make sure to release the client after use
         console.log(result.rows[0].roleid); 
         if (result.rows.length > 0 && result.rows[0].roleid === 1) {
             next(); // Proceed if admin

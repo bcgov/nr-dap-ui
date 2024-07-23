@@ -14,7 +14,7 @@ let pgClient;  // Client for PostgreSQL ODS Database
 
 
 const getApplications = async (email) => {
-    const client = await connectDatabase('testlocal');
+    const client = await connectDatabase(process.env.DATABASE_ODS_IN_VAULT);
 
     // First, determine if the user is an admin
     let roleCheckQuery = `
@@ -65,11 +65,10 @@ const getApplications = async (email) => {
 router.get('/', async (req, res) => {
 
     try {
-        pgClient = await connectDatabase('testlocal');
+        pgClient = await connectDatabase(process.env.DATABASE_ODS_IN_VAULT);
         const userDetails = req.kauth.grant.access_token.content;
         const email = userDetails.email;
         const isAdmin = userDetails.realm_access && userDetails.realm_access.roles.includes('admin');
-        console.log(isAdmin);
         const apps = await getApplications(email, isAdmin);
         res.render('appList', { apps, isAdmin });
     } catch (error) {

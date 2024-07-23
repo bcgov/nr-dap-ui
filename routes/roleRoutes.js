@@ -16,7 +16,7 @@ let pgClient;  // Client for PostgreSQL ODS Database
 // GET all roles
 router.get('/', async (req, res) => {
     try {
-        pgClient = await connectDatabase('testlocal'); // Connect to PostgreSQL ODS Database
+        pgClient = await connectDatabase(process.env.DATABASE_ODS_IN_VAULT); // Connect to PostgreSQL ODS Database
         const result = await pgClient.query('SELECT * FROM dapui.role');
         res.render('roles/list', { roles: result.rows });
     } catch (error) {

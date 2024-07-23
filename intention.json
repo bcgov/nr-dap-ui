@@ -2,6 +2,7 @@
     "event": {
       "provider": "nr-data-analytics-platform",
       "reason": "Data Sync",
+      "transient":"true",
       "url": "JOB"
     },
     "actions": [

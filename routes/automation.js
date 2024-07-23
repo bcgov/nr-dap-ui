@@ -89,14 +89,83 @@ async function insertIntoDatatable(tableName, applicationName, userEmail) {
     }
     const ownerUserId = userRes.rows[0].userid;
 
-    const insertQuery = `
-        INSERT INTO dapui.datatable (tablename, applicationname, owneruserid)
-        VALUES ($1, $2, $3)
-        RETURNING *;
+    // Check if the entry already exists
+    const checkQuery = `
+    SELECT * FROM dapui.datatable
+    WHERE tablename = $1 AND applicationname = $2 AND owneruserid = $3;
     `;
-    const insertRes = await pgClient.query(insertQuery, [tableName, applicationName, ownerUserId]);
+    const checkRes = await pgClient.query(checkQuery, [tableName, applicationName, ownerUserId]);
+    if (checkRes.rows.length > 0) {
+    console.log('Entry already exists in datatable. Skipping insertion.');
+    return; // Skip insertion because entry already exists
+    }
+
+    // Insert query if no entry exists
+    const insertQuery = `
+    INSERT INTO dapui.datatable (tablename, applicationname, owneruserid)
+    VALUES ($1, $2, $3)
+    RETURNING *;
+    `;
+    const insertRes = await pgClient.query(insertQuery, [tableName.toLowerCase(), applicationName, ownerUserId]);
     console.log('Inserted into datatable:', insertRes.rows[0]);
 }
+
+//Generate a user and roles.
+const crypto = require('crypto');
+
+async function createUserAndGrantAccess(userEmail, selectedTables, schemaName, pgClient) {
+    try {
+        // Retrieve username from the user table
+        const userQuery = 'SELECT username FROM dapui."user" WHERE email = $1';
+        const userRes = await pgClient.query(userQuery, [userEmail]);
+        if (userRes.rows.length === 0) {
+            throw new Error('User not found.');
+        }
+        const username = userRes.rows[0].username;
+
+        // Generate a secure random password
+        const password = crypto.randomBytes(16).toString('hex');
+
+        // Check if user already exists
+        const roleCheckQuery = 'SELECT rolname FROM pg_roles WHERE rolname = $1';
+        const roleCheckRes = await pgClient.query(roleCheckQuery, [username]);
+        if (roleCheckRes.rows.length === 0) {
+            // Create user if not exists
+            const createUserQuery = `CREATE ROLE "${username}" WITH LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`;
+            
+            await pgClient.query(createUserQuery);
+            console.log(`User ${username} created with a new password.`);
+        } else {
+            // Update password if user exists
+            const updatePasswordQuery = `ALTER ROLE "${username}" WITH PASSWORD '${password}'`;
+            await pgClient.query(updatePasswordQuery);
+            console.log(`Password updated for existing user ${username}.`);
+        }
+
+        // Manage schema access, if it is same schema, revoke
+        // const revokeQuery = `REVOKE ALL ON ALL TABLES IN SCHEMA "${schemaName}" FROM "${username}"`;
+        // await pgClient.query(revokeQuery);
+
+        // Grant SELECT on each table in the schema
+        for (const tableName of selectedTables) {
+            const grantQuery = `GRANT SELECT ON "${schemaName}"."${tableName.toLowerCase()}" TO "${username}"`;
+            await pgClient.query(grantQuery);
+            console.log(`Access granted for ${username} on table ${tableName.toLowerCase()} in schema ${schemaName}.`);
+        }
+
+        // Return user details including the password
+        return { username, password, schemaAccess: schemaName, tables: selectedTables, action: roleCheckRes.rows.length === 0 ? "created" : "updated" };
+
+    } catch (error) {
+        console.error('Failed to create user or update access:', error);
+        throw error; // Rethrow to handle it in the calling context
+    }
+}
+
+
+
+
+
 
   // Main route
   router.get('/', async (req, res) => {
@@ -123,10 +192,10 @@ async function insertIntoDatatable(tableName, applicationName, userEmail) {
 
         // Pass the client/connection to the logging function
         await logUserVisit(userDetails, pgClient);
-
         // Verify user email
         const isAuthorized = await verifyUserEmail(userDetails.email, pgClient);
-        if (!isAuthorized) {
+        console.log(isAuthorized);
+        if (isAuthorized) {
         console.log('granted access'); 
           // User found, access granted
           try {
@@ -146,7 +215,7 @@ async function insertIntoDatatable(tableName, applicationName, userEmail) {
             oracleConnection = await connectDatabase(vaultName);
 
             //get application database schema name
-            sourceSchemaName = useCredentials(); 
+            sourceSchemaName = useCredentials(vaultName); 
             console.log(sourceSchemaName); 
             targetSchemaName = `test_${sourceSchemaName.toLowerCase()}_replication`;
             //get ODS user and application information.
@@ -235,8 +304,9 @@ router.post('/generate-ddl', async (req, res) => {
         // Check and create schema if not exists
         queriesToRun.push(`CREATE SCHEMA IF NOT EXISTS ${targetSchemaName.toLowerCase()}`);
 
-        for (const tableName of Array.isArray(selectedTables) ? selectedTables : [selectedTables]) {
+        for (let tableName of Array.isArray(selectedTables) ? selectedTables : [selectedTables]) {
             const columns = await getColumnsForTable(tableName);
+            tableName = tableName.toLowerCase();
             let ddl = `CREATE TABLE IF NOT EXISTS ${targetSchemaName.toLowerCase()}."${tableName.toLowerCase()}" (\n`;
             columns.forEach(column => {
                 let columnType = column.DATA_TYPE.toLowerCase();
@@ -310,6 +380,18 @@ router.post('/generate-ddl', async (req, res) => {
         for (const query of queriesToRun) {
             await executePostgresQuery(query);
         }
+        let newUserDetails; 
+        // After successful creation of tables, attempt to create user and grant access
+        try {
+            newUserDetails = await createUserAndGrantAccess(userEmail, selectedTables, targetSchemaName, pgClient);
+            console.log('User created with details:', newUserDetails);
+
+
+        } catch (userCreationError) {
+            console.error('Failed to create user or grant access:', userCreationError);
+            res.status(500).send('Failed to create user or grant permissions.');
+            return; // Stop further execution in case of an error
+        }
 
         // Calculate replication order and insert into CDC master table
         let replicationOrder = 1;
@@ -341,17 +423,89 @@ router.post('/generate-ddl', async (req, res) => {
             for (const tableName of selectedTables) {
                 await insertIntoDatatable(tableName, applicationName, userEmail);
             }
-            console.log('Tables inserted cdc master table');
-            await triggerAirflowDAG('auto_dag_creation');  // Trigger the Airflow DAG
-            console.log('DAG triggered successfully.');
+            console.log('Tables inserted into cdc master table');
+           
         } catch (error) {
             console.error('Failed to process request:', error);
             res.status(500).send('An error occurred during processing.');
         }
         // res.send(`<pre>Queries executed successfully. Check the console for details.</pre>`);
-        const url = "/appList"; // Replace with your actual URL
-        const message = `<pre><pre>Data extraction setup successfully. Contact data foundation team to get Power BI Gateway to start using the data.<a href="${url}">Go Back to the application List.</a></pre>`;
+        const url = "/appList"; 
+        const message = `
+        <html>
+        <head>
+            <title>Setup Complete</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100vh;
+                    margin: 0;
+                    background-color: #f4f4f4;
+                }
+                .content {
+                    text-align: center;
+                    background: white;
+                    padding: 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                }
+                .credentials {
+                    background-color: #eef;
+                    border: 1px solid #ccd;
+                    padding: 10px;
+                    margin-top: 20px;
+                }
+                strong {
+                    font-weight: bold;
+                }
+                a {
+                    display: inline-block;
+                    margin-top: 20px;
+                    padding: 10px 20px;
+                    background-color: #0056b3;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 5px;
+                }
+                a:hover {
+                    background-color: #003580;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="content">
+                <h1>Data Extraction Setup Successfully</h1>
+                <p>Contact the data foundation team to get the Power BI Gateway to start using the data.</p>
+                <div class="credentials">
+                    You can also use direct access to connect to our ODS database.<br>
+                    Here are the credentials:<br>
+                    <strong>HOST:</strong>theory.bcgov<br>
+                    <strong>PORT:</strong>5433<br>
+                    <strong>DATABASE:</strong>odsdev<br>
+                    <strong>Username:</strong> ${newUserDetails.username}<br>
+                    <strong>Password:</strong> ${newUserDetails.password}<br>
+                    <strong>Please copy the above information. keep these in a safe place!</strong><br>
+                    <strong>If you forgort the credentials, you can re-start the data pull process again!</strong>
+                </div>
+                <a href="${url}">Go Back to the Application List</a>
+            </div>
+        </body>
+        </html>
+        `;
+        newUserDetails={};
         res.send(message);
+         // Try to trigger the Airflow DAG
+         try {
+            await triggerAirflowDAG();  // Assuming 'auto_dag_creation' is managed within the function
+            console.log('DAG triggered successfully.');
+        } catch (dagError) {
+            console.error('Failed to trigger Airflow DAG:', dagError);
+            // Optionally, send a specific error response or take additional recovery actions
+        }
+        
     } catch (error) {
         console.error('Error during DDL generation or execution:', error);
         res.status(500).send(`An error occurred: ${error.message}`);

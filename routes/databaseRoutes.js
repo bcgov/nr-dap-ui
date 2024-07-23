@@ -25,7 +25,7 @@ async function getAllUsers(pgClient) {
 
 // Route to list all databases
 router.get('/', async (req, res) => {
-    pgClient = await connectDatabase('testlocal');
+    pgClient = await connectDatabase(process.env.DATABASE_ODS_IN_VAULT);
     try {
         const result = await pgClient.query('SELECT d.databaseid, d.databasename, d.applicationname, d.vaultname, d.schemaname, u.username as ownerusername FROM dapui.database d JOIN dapui.user u ON d.owneruserid = u.userid;');
         res.render('databases/list', { databases: result.rows });

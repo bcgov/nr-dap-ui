@@ -26,7 +26,7 @@ async function getAllRoles(pgClient) {
 
 // Route to list all users
 router.get('/', async (req, res) => {
-    pgClient = await connectDatabase('testlocal'); // Connect to PostgreSQL ODS Database
+    pgClient = await connectDatabase(process.env.DATABASE_ODS_IN_VAULT); // Connect to PostgreSQL ODS Database
     roles = await getAllRoles(pgClient); // Ensure pgClient is your connected and authorized Postgres client
     try {
         const result = await pgClient.query('SELECT u.userid, u.username, u.firstname, u.lastname, u.email, r.rolename FROM dapui.user u JOIN dapui.role r ON u.roleid = r.roleid;');
