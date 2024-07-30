@@ -1,4 +1,4 @@
-name: Deploy to OpenShift
+name: Build and Deploy to OpenShift
 
 on:
   push:
@@ -6,28 +6,29 @@ on:
       - main
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v2
-      with:
-        node-version: '14'
-
-    - name: Install dependencies
-      run: npm install
-
-    - name: Log in to GitHub Container Registry
+    - name: Log in to GHCR
       run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-    - name: Build and push Docker image
-      run: |
-        docker build -t ghcr.io/bcgov/nr-dap-ui:${{ github.sha }} .
-        docker push ghcr.io/bcgov/nr-dap-ui:${{ github.sha }}
+    - name: Build Docker image
+      run: docker build -t ghcr.io/${{ github.repository }}/nr-dap-ui:latest .
+
+    - name: Push Docker image to GHCR
+      run: docker push ghcr.io/${{ github.repository }}/nr-dap-ui:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
 
     - name: Install OpenShift CLI
       run: |
@@ -36,11 +37,11 @@ jobs:
         sudo mv oc /usr/local/bin/
 
     - name: Log in to OpenShift
-      run: |
-        oc login ${{ secrets.OPENSHIFT_SERVER_URL }} --token=${{ secrets.OPENSHIFT_TOKEN }}
+      run: oc login ${{ secrets.OPENSHIFT_SERVER_URL }} --token=${{ secrets.OPENSHIFT_TOKEN }}
 
     - name: Deploy to OpenShift
       run: |
         oc project ${{ secrets.OPENSHIFT_NAMESPACE }}
-        oc set image deployment/nr-dap-ui nr-dap-ui=ghcr.io/bcgov/nr-dap-ui:${{ github.sha }} --record
-        oc rollout status deployment/nr-dap-ui
+        oc tag --source=docker ghcr.io/${{ github.repository }}/nr-dap-ui:latest nr-dap-ui:latest
+        oc new-app --docker-image=ghcr.io/${{ github.repository }}/nr-dap-ui:latest --name=nr-dap-ui || oc rollout latest dc/nr-dap-ui
+        oc expose svc/nr-dap-ui
