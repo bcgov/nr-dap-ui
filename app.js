@@ -16,6 +16,7 @@ const { getOracleCredentials } = require('./modules/getOracleCredentials');
 const { connectToPosgDatabase } = require('./modules/connectToPosgDatabase');
 const { connectDatabase, useCredentials } = require('./modules/connectDatabase');
 const { connectToOracleDatabase } = require('./modules/connectToOracleDatabase');
+const uploadBIRouter= require('./routes/uploadBI');
 const { verifyUserEmail } = require('./modules/verifyUserEmail');
 const { getUserDetails } = require('./modules/getUserDetails');
 const { logUserVisit } = require('./modules/logUserVisit');
@@ -79,7 +80,7 @@ app.use('/automation', keycloak.protect(), automationRouter)
 // app.use('/users', keycloak.protect(), userRoutes);
 // app.use('/databases',  keycloak.protect(), databaseRouters);
 // app.use('/appList', keycloak.protect(), appRouters);
-
+app.use('/uploadBI', keycloak.protect(), uploadBIRouter);
 app.use('/roles', keycloak.protect(), checkAdminRole, roleRoutes); // Accessible only to admins
 app.use('/users', keycloak.protect(), checkAdminRole, userRoutes); // Accessible only to admins
 app.use('/databases', keycloak.protect(), checkAdminRole, databaseRouters); // Accessible only to admins

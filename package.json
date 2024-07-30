@@ -9,10 +9,11 @@
     "ejs": "^3.1.10",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
-    "keycloak-connect": "^25.0.0",
+    "keycloak-connect": "^25.0.2",
+    "multer": "^1.4.5-lts.1",
     "node-fetch": "^3.3.2",
     "node-vault": "^0.10.2",
-    "oracledb": "^6.5.1",
+    "oracledb": "^6.6.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
@@ -20,7 +21,7 @@
     "requests": "^0.3.0"
   },
   "devDependencies": {
-    "webpack": "^5.92.0",
+    "webpack": "^5.93.0",
     "webpack-cli": "^5.1.4"
   },
   "name": "manage",

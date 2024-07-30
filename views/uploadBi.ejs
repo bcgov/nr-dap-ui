@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Power BI File</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <%- include('./partials/header', { title: 'Application List' }) %>
+    <h1>Upload a Power BI File</h1>
+    <form action="/uploadBI/upload" method="post" enctype="multipart/form-data">
+        <label for="environment">Upload a Power BI File, please choose the Power BI environment:</label>
+        <select name="environment" id="environment" required>
+            <option value="dev">DEV-Development</option>
+            <option value="test">TEST-Test</option>
+            <option value="prod">PROD-Production</option>
+        </select>
+        <h1></h1>
+        <label for="environment"></label>
+        <input type="file" name="pbixfile" accept=".pbix" required>
+        <button type="submit">Upload and Publish</button>
+    </form>
+    <%- include('./partials/footer') %>
+</body>
+</html>
