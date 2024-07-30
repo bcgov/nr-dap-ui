@@ -1,4 +1,4 @@
-name: Build and Deploy to OpenShift
+name: Build and Push to GHCR
 
 on:
   push:
@@ -21,27 +21,3 @@ jobs:
 
     - name: Push Docker image to GHCR
       run: docker push ghcr.io/${{ github.repository }}/nr-dap-ui:latest
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-
-    - name: Install OpenShift CLI
-      run: |
-        curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz
-        tar -xvf oc.tar.gz
-        sudo mv oc /usr/local/bin/
-
-    - name: Log in to OpenShift
-      run: oc login ${{ secrets.OPENSHIFT_SERVER_URL }} --token=${{ secrets.OPENSHIFT_TOKEN }}
-
-    - name: Deploy to OpenShift
-      run: |
-        oc project ${{ secrets.OPENSHIFT_NAMESPACE }}
-        oc tag --source=docker ghcr.io/${{ github.repository }}/nr-dap-ui:latest nr-dap-ui:latest
-        oc new-app --docker-image=ghcr.io/${{ github.repository }}/nr-dap-ui:latest --name=nr-dap-ui || oc rollout latest dc/nr-dap-ui
-        oc expose svc/nr-dap-ui
