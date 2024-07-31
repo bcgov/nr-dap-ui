@@ -1,4 +1,5 @@
 const express = require('express');
+const morgan = require('morgan');
 require('dotenv').config();
 const bodyParser = require('body-parser');
 const session = require('express-session');
@@ -30,6 +31,7 @@ const keycloak = new Keycloak({ store: memoryStore }, keycloakConfig);
 const dataTableRoutes = require('./routes/dataTableRoutes');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
+app.use(morgan('combined'));
 app.use(session({
     secret: 'fjhdjkfhsdkjafhn34k32hj24jh32j4h23jh4kj32',
     resave: false,
@@ -73,6 +75,7 @@ app.set('views', path.join(__dirname, 'views'));
 app.get(['/', '/index'], keycloak.protect(), (req, res) => {
     res.render('index', { user: req.kauth.grant.access_token.content });
 });
+
 // Use routes
 
 app.use('/automation', keycloak.protect(), automationRouter)
