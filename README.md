@@ -40,6 +40,13 @@ Edit the secret key. KEYCLOAK_SECRET is for SSO. CONFIG_BROKER_JWT is for vault 
    npm install
    node app.js
    
+2. **Deploy to openshift**:
+   ```sh
+   oc new-app --docker-image=ghcr.io/zhongjixiehou/nr-dap-ui:latest --name=nr-dap-ui
+### update
+   ```sh
+   oc set image dc/nr-dap-ui nr-dap-ui=ghcr.io/zhongjixiehou/nr-dap-ui:latest --record
+   oc rollout latest dc/nr-dap-ui
 
 ### Contact
 
