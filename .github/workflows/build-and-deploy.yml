@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Setup Node.js
       uses: actions/setup-node@v3
@@ -22,7 +22,7 @@ jobs:
       run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
     - name: Build Docker image
-      run: docker build -t ghcr.io/${{ github.repository }}/nr-dap-ui:latest .
+      run: docker build -t ghcr.io/${{ github.repository }}/nr-dap-ui1:latest .
 
     - name: Push Docker image to GHCR
-      run: docker push ghcr.io/${{ github.repository }}/nr-dap-ui:latest
+      run: docker push ghcr.io/${{ github.repository }}/nr-dap-ui1:latest
