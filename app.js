@@ -1,5 +1,4 @@
 const express = require('express');
-const morgan = require('morgan');
 require('dotenv').config();
 const bodyParser = require('body-parser');
 const session = require('express-session');
@@ -31,7 +30,6 @@ const keycloak = new Keycloak({ store: memoryStore }, keycloakConfig);
 const dataTableRoutes = require('./routes/dataTableRoutes');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
-app.use(morgan('combined'));
 app.use(session({
     secret: 'fjhdjkfhsdkjafhn34k32hj24jh32j4h23jh4kj32',
     resave: false,
@@ -75,37 +73,18 @@ app.set('views', path.join(__dirname, 'views'));
 app.get(['/', '/index'], keycloak.protect(), (req, res) => {
     res.render('index', { user: req.kauth.grant.access_token.content });
 });
-
+// app.get('/', (req, res) => {
+//     res.send('Hello, World!');
+//   });
 // Use routes
 
 app.use('/automation', keycloak.protect(), automationRouter)
-// app.use('/roles', keycloak.protect(), roleRoutes);
-// app.use('/users', keycloak.protect(), userRoutes);
-// app.use('/databases',  keycloak.protect(), databaseRouters);
-// app.use('/appList', keycloak.protect(), appRouters);
 app.use('/uploadBI', keycloak.protect(), uploadBIRouter);
 app.use('/roles', keycloak.protect(), checkAdminRole, roleRoutes); // Accessible only to admins
 app.use('/users', keycloak.protect(), checkAdminRole, userRoutes); // Accessible only to admins
 app.use('/databases', keycloak.protect(), checkAdminRole, databaseRouters); // Accessible only to admins
 app.use('/appList', keycloak.protect(), appRouters); // Accessible to all authenticated users
 app.use('/table', keycloak.protect(), dataTableRoutes);
-
-// app.get('/users', keycloak.protect(), (req, res) => {
-//     // Example: Fetch users from database and pass to the EJS template
-//     res.render('users', { users: fetchedUsers });
-// });
-
-
-// // Role Management route
-// app.get('/roles', keycloak.protect(), (req, res) => {
-//     res.render('roles', { roles: fetchedRoles });
-// });
-
-// Database Management route
-// app.get('/databases', keycloak.protect(), (req, res) => {
-//     res.render('databases', { databases: fetchedDatabases });
-// });
-
 
 
 // app.listen(port, () => {

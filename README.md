@@ -45,9 +45,7 @@ Edit the secret key. KEYCLOAK_SECRET is for SSO. CONFIG_BROKER_JWT is for vault 
    oc new-app --docker-image=ghcr.io/zhongjixiehou/nr-dap-ui:latest --name=nr-dap-ui
 ### update
    ```sh
-   oc set image dc/nr-dap-ui nr-dap-ui=ghcr.io/zhongjixiehou/nr-dap-ui:latest --record
-   oc rollout latest dc/nr-dap-ui
-
+   oc rollout restart deployment/nr-dap-ui
 ### Contact
 
 If you have any questions or need further assistance, please feel free to reach out via email: NRM.DataFoundations at gov.bc.ca.

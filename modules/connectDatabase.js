@@ -54,7 +54,7 @@ async function connectDatabase(secretName) {
         } else {
             console.log("Using cached credentials.");
         }
-
+        // console.log(JSON.stringify(credentials, null, 2));
         if (credentials) {
             const dbType = credentials.data.dbtype;
             let connectionInfo = connectionCache[dbType];
