@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Role</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <%- include('../partials/header', { title: 'Role Management' }) %>
+    <h1>Edit Role</h1>
+    <form action="/roles/edit/<%= role.roleid %>" method="post">
+        <label for="rolename">Role Name:</label>
+        <input type="text" id="rolename" name="rolename" value="<%= role.rolename %>" required><br>
+        <label for="description">Description:</label>
+        <input type="text" id="description" name="description" value="<%= role.description %>" required><br>
+        <button type="submit">Update Role</button>
+    </form>
+    <a href="/roles">Back to List</a>
+    <%- include('../partials/footer') %>
+</body>
+</html>

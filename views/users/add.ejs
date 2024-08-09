@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add User</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <h1>Add User</h1>
+    <form action="/users/add" method="post">
+        <div>
+            <label for="username">Team User Name:</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+        <div>
+            <label for="firstname">First Name:</label>
+            <input type="text" id="firstname" name="firstname" required>
+        </div>
+        <div>
+            <label for="lastname">Last Name:</label>
+            <input type="text" id="lastname" name="lastname" required>
+        </div>
+        <div>
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+        <div>
+            <label for="roleid">Role:</label>
+            <select id="roleid" name="roleid" required>
+                <% roles.forEach(role => { %>
+                    <option value="<%= role.roleid %>"><%= role.rolename %></option>
+                <% }) %>
+            </select>
+        </div>
+        <button type="submit">Add User</button>
+    </form>
+    <a href="/users">Back to List</a>
+    <%- include('../partials/footer') %>
+</body>
+</html>

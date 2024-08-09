@@ -1,0 +1,52 @@
+<!-- Include Bootstrap CSS -->
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+
+<!-- Include jQuery and Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+<script> $(document).ready(function() {
+    // Get the current URL path and remove trailing slash (if exists)
+    var currentPath = window.location.pathname.replace(/\/$/, "");
+
+    // Iterate over each <a> element in the navigation
+    $('.navigation-main ul li a').each(function() {
+        var menuPath = $(this).attr('href');
+
+        // Compare if the menuPath is part of the currentPath
+        if (currentPath.includes(menuPath)) {
+            // Add 'active' class to parent <li> element
+            $(this).closest('li').addClass('active');
+        }
+    });
+});
+</script>
+<header>
+    <div class="banner">
+        <a href="/" alt="British Columbia">
+            <img src="images/BCID_H_rgb_rev.svg" alt="Go to the Government of British Columbia website" class="logo-banner"/>
+        </a>
+        <h1>DAP Data Extraction and Management System</h1>
+    </div>
+
+</header>
+
+<nav class="navigation-main" id="navbar">
+    <div class="container">
+        <ul>
+
+
+            <li><a href="index">Home</a></li>
+            <li><a href="/users">User Management</a></li>
+            <li><a href="/roles">Role Management</a></li>
+            <li><a href="/databases">Database Management</a></li>
+            <li><a href="/table">Pulled data Management</a></li>
+            <li><a href="/uploadBI">Publish BI</a></li>
+            <li><a href="https://nr-airflow-test.apps.emerald.devops.gov.bc.ca/home">DAG Management</a></li>
+            <li><a href="/appList">Data Extraction Tool</a></li>
+
+        </ul>
+    </div>
+</nav>
+
+

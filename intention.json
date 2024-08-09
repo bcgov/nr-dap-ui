@@ -1,0 +1,23 @@
+{
+    "event": {
+      "provider": "nr-data-analytics-platform",
+      "reason": "Data Sync",
+      "transient":"true",
+      "url": "JOB"
+    },
+    "actions": [
+      {
+        "action": "database-access",
+        "id": "dap-data-sync",
+        "provision": ["token/self"],
+        "service": {
+          "name": "nr-data-analytics-platform",
+          "project": "nr-data-solutions",
+          "environment": "development"
+        }
+      }
+    ],
+    "user": {
+      "name": "w1zhang@azureidir"
+    }
+  }

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Application List</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <%- include('./partials/header', { title: 'Application List' }) %>
+    <h1><% if (isAdmin) { %>All Applications<% } else { %>Your Applications<% } %></h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Application Name</th>
+                <th>Vault Secret Name</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% apps.forEach(app => { %>
+                <tr>
+                    <td><%= app.applicationname %></td>
+                    <td><%= app.vaultname %></td>
+                    <td><a href="/automation?vaultName=<%= app.vaultname %>&applicationName=<%= app.applicationname %>">Pull the data</a></td>
+                </tr>
+            <% }) %>
+        </tbody>
+    </table>
+    <%- include('./partials/footer') %>
+</body>
+</html>

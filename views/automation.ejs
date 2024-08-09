@@ -1,0 +1,39 @@
+<html>
+<head>
+    <title>Select Tables</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f9; }
+        h1 { color: #333; }
+        ul { padding: 0; }
+        li { list-style: none; margin-bottom: 10px; }
+        input[type="checkbox"] { margin-right: 10px; }
+        input[type="submit"] { margin-top: 20px; padding: 10px 20px; background-color: #0056b3; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        input[type="submit"]:hover { background-color: #003580; }
+        form { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    </style>
+    <script>
+        function selectAll() {
+            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => checkbox.checked = true);
+        }
+
+        function deselectAll() {
+            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => checkbox.checked = false);
+        }
+    </script>
+</head>
+<body>
+    <h1 style="text-align: center;">Welcome to the DAP Data Extraction Tool!</h1>
+    <h1>Select the tables you want to extract data from.</h1>
+    <form action="/automation/generate-ddl" method="post">
+        <input type="button" value="Select All" onclick="selectAll()">
+        <input type="button" value="Deselect All" onclick="deselectAll()">
+        <ul>
+            <% tables.forEach(table => { %>
+                <li><input type="checkbox" name="tables" value="<%= table %>"><%= table %></li>
+            <% }); %>
+        </ul>
+        <input type="submit" value="Submit">
+    </form>
+    
+</body>
+</html>

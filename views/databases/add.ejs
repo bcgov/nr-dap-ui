@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add Database</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <%- include('../partials/header', { title: 'Add Database' }) %>
+    <h1>Add New Database</h1>
+    <form method="post" action="/databases/add">
+        <label for="databasename">Database Name:</label>
+        <input type="text" id="databasename" name="databasename" required><br>
+
+        <label for="applicationname">Application Name:</label>
+        <input type="text" id="applicationname" name="applicationname" required><br>
+
+        <label for="vaultname">Vault Name:</label>
+        <input type="text" id="vaultname" name="vaultname" required><br>
+
+        <label for="schemaname">Schema Name:</label>
+        <input type="text" id="schemaname" name="schemaname" required><br>
+
+        <label for="owneruserid">Owner User:</label>
+        <select id="owneruserid" name="owneruserid">
+            <% users.forEach(user => { %>
+                <option value="<%= user.userid %>"><%= user.username %></option>
+            <% }) %>
+        </select><br>
+
+        <button type="submit">Add Database</button>
+    </form>
+    <%- include('../partials/footer') %>
+</body>
+</html>
