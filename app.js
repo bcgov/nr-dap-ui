@@ -32,7 +32,7 @@ const keycloak = new Keycloak({ store: memoryStore }, keycloakConfig);
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use(session({
-    secret: 'fjhdjkfhsdkjafhn34k32hj24jh32j4h23jh4kj32',
+    secret: process.env.SESSION_SEC,
     resave: false,
     saveUninitialized: true,
     store: memoryStore
