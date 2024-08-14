@@ -36,18 +36,18 @@ const workspaceIDs = {
 };
 
 // Token retrieval for Power BI
+
 async function getPowerBIToken() {
     const url = `https://login.microsoftonline.com/${process.env.TENANT_ID}/oauth2/v2.0/token`;
 
-    const params = new URLSearchParams({
-        client_id: process.env.CLIENT_ID,
-        client_secret: process.env.CLIENT_SECRET,
-        resource: "https://analysis.windows.net/powerbi/api", 
-        grant_type: "client_credentials"
-    }).toString();
+    // Manually construct the parameters string to avoid encoding issues
+    const params = `client_id=${process.env.CLIENT_ID}` +
+                   `&scope=https://analysis.windows.net/powerbi/api/.default` +
+                   `&client_secret=${process.env.CLIENT_SECRET}` +  // Keep client_secret as is
+                   `&grant_type=client_credentials`;
 
     const config = {
-        // headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     };
 
     // Check if running in OpenShift with a proxy
