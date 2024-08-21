@@ -6,7 +6,7 @@ const session = require('express-session');
 const Cryptr = require('cryptr');
 const bodyParser = require('body-parser');
 const fs = require('fs');
-const { Pool } = require('pg'); // PostgreSQL client
+const { Pool } = require('pg'); 
 const oracledb = require('oracledb');
 const app = express();
 const port = 3000;
@@ -35,11 +35,15 @@ app.use(session({
     secret: process.env.SESSION_SEC,
     resave: false,
     saveUninitialized: true,
-    store: memoryStore
+    store: memoryStore,
+    cookie: {
+        maxAge: null // Session cookie will expire when the browser is closed
+    }
 }));
 
+
 app.use(keycloak.middleware({
-    logout: '/logout',
+    // logout: '/logout',
     admin: '/',
 }));
 
@@ -52,10 +56,10 @@ async function checkAdminRole(req, res, next) {
     const email = req.kauth.grant.access_token.content.email;
 
     try {
-        const pgClient = await connectDatabase(process.env.DATABASE_ODS_IN_VAULT); // Connect to PostgreSQL ODS Database using a specific identifier if needed
+        const pgClient = await connectDatabase(process.env.DATABASE_ODS_IN_VAULT);
         const result = await pgClient.query('SELECT roleid FROM dapui."user" WHERE email = $1', [email]);
         console.log(result); 
-        // pgClient.release();  // Make sure to release the client after use
+        // pgClient.release();  
         console.log(result.rows[0].roleid); 
         if (result.rows.length > 0 && result.rows[0].roleid === 1) {
             next(); // Proceed if admin
@@ -86,6 +90,51 @@ app.use('/users', keycloak.protect(), checkAdminRole, userRoutes); // Accessible
 app.use('/databases', keycloak.protect(), checkAdminRole, databaseRouters); // Accessible only to admins
 app.use('/appList', keycloak.protect(), appRouters); // Accessible to all authenticated users
 app.use('/table', keycloak.protect(), dataTableRoutes);
+
+app.get('/logouts', async (req, res) => {
+    try {
+        // Close PostgreSQL connections if stored in the session
+        if (req.session.pgClient) {
+            try {
+                await req.session.pgClient.end();
+                console.log('End postgre connection'); 
+            } catch (error) {
+                console.error('Failed to close PostgreSQL connection:', error);
+            }
+        }
+
+        // Close Oracle connections if stored in the session
+        if (req.session.oracleClient && oracledb.getPool()) {
+            try {
+                await oracledb.getPool().close(0);
+                console.log('End oracle connection'); 
+
+            } catch (error) {
+                console.error('Failed to close Oracle connection:', error);
+            }
+        }
+
+        // Destroy the session
+        req.session.destroy(err => {
+            console.log('destroy the session'); 
+            if (err) {
+                console.error('Error destroying session:', err);
+                return res.status(500).send('Internal server error');
+            }
+
+            // Render the logout page
+            res.render('logouts');
+        });
+
+    } catch (error) {
+        console.error('Error during logout process:', error);
+        res.status(500).send('Internal server error');
+    }
+});
+
+
+
+
 
 
 // app.listen(port, () => {

@@ -7,7 +7,7 @@ const axios = require('axios');
 const router = express.Router();
 const os = require('os');
 const HttpsProxyAgent = require('https-proxy-agent');
-
+const tls = require('tls');
 // Determine the directory for uploads
 const uploadsDir = fs.existsSync('/mnt/storage') ? '/mnt/storage' : os.tmpdir();
 
@@ -21,13 +21,13 @@ const storage = multer.diskStorage({
         cb(null, uploadsDir);
     },
     filename: function (req, file, cb) {
-        cb(null, file.originalname); // Save the file with the original 
+        cb(null, file.originalname); // Save the file with the original name
         console.log('Save the file with the original name');
     }
 });
 
-
 const upload = multer({ storage: storage });
+
 // Environment-specific workspace IDs
 const workspaceIDs = {
     dev: 'c7ef19d0-b230-4b9e-89e2-984fccc75198',
@@ -36,25 +36,26 @@ const workspaceIDs = {
 };
 
 // Token retrieval for Power BI
-
 async function getPowerBIToken() {
     const url = `https://login.microsoftonline.com/${process.env.TENANT_ID}/oauth2/v2.0/token`;
 
-    // Manually construct the parameters string to avoid encoding issues
     const params = `client_id=${process.env.CLIENT_ID}` +
                    `&scope=https://analysis.windows.net/powerbi/api/.default` +
                    `&client_secret=${process.env.CLIENT_SECRET}` +  // Keep client_secret as is
-                   `&grant_type=client_credentials`;
-
+                   `&grant_type=client_credentials`;              
     const config = {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     };
 
     // Check if running in OpenShift with a proxy
-    if (process.env.HTTP_PROXY) {
-        const proxyAgent = new HttpsProxyAgent(process.env.HTTP_PROXY);
+    if (process.env.HTTPS_PROXY) {
+        const proxyAgent = new HttpsProxyAgent({
+            host: process.env.HTTPS_PROXY,
+            rejectUnauthorized: false, // Optional: skip SSL verification for proxy
+            secureOptions: tls.SSL_OP_NO_TLSv1 | tls.SSL_OP_NO_TLSv1_1 // Force TLS 1.2+
+        });
         config.httpsAgent = proxyAgent;
-        console.log('Using proxy:', process.env.HTTP_PROXY);
+        console.log('Using proxy:', process.env.HTTPS_PROXY);
     }
 
     // Log the request parameters for debugging
@@ -79,7 +80,6 @@ async function getPowerBIToken() {
     }
 }
 
-
 // Helper function to fetch dataset users
 async function getDatasetReadUsers(workspaceId, datasetId, token) {
     const url = `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/datasets/${datasetId}/users`;
@@ -97,7 +97,6 @@ async function getDatasetReadUsers(workspaceId, datasetId, token) {
         throw new Error('Failed to retrieve dataset users');
     }
 }
-
 
 // Retrieve report details using file name
 async function getReportDetails(workspaceId, token, fileName) {
@@ -139,7 +138,7 @@ router.post('/upload', upload.single('pbixfile'), async (req, res) => {
     try {
         console.log('try to get getPowerBI Token');
         const token = await getPowerBIToken();
-        console.log('getPowerBIToken funtion runned');
+        console.log('getPowerBIToken function run');
         const publishResult = await publishToPowerBI(req.file.path, workspaceId, token);
         console.log(publishResult.id);
         const reportDetails = await getReportDetails(workspaceId, token, req.file.originalname);
@@ -187,14 +186,13 @@ router.post('/upload', upload.single('pbixfile'), async (req, res) => {
         </head>
         <body>
             <div class="container">
-                <h2>File uploaded and published successfully.${reportDetails.users}</h2>
+                <h2>File uploaded and published successfully. ${reportDetails.users}</h2>
                 <p><a href="https://app.powerbi.com/groups/${workspaceId}/reports/${reportDetails.id}" target="_blank">View Report</a></p>
                 <p><a href="/" class="back">Go to homepage</a></p>
             </div>
         </body>
         </html>
     `);
-        // res.send(`File uploaded and published successfully. Report URL: https://app.powerbi.com/groups/${workspaceId}/reports/${reportDetails.id}`);
     } catch (error) {
         console.error('Error:', error.message);
         res.status(500).send(`Error: ${error.message}`);

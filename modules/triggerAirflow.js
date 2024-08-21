@@ -60,6 +60,7 @@ async function isDAGRunning(airflowApiUrl, dagId) {
 // Function to trigger an Airflow DAG
 async function triggerAirflowDAG() {
     const airflowApiUrl = `https://nr-airflow-${process.env.CONFIG_ENV}.apps.emerald.devops.gov.bc.ca/api/v1/dags`;
+    // const airflowApiUrl = `https://nr-airflow-test.apps.emerald.devops.gov.bc.ca/api/v1/dags`;
     const dagId = 'auto_dag_creation';
 
     // Check if DAG is currently running
