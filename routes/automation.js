@@ -12,7 +12,7 @@ const { verifyUserEmail } = require('../modules/verifyUserEmail');
 const { getUserDetails } = require('../modules/getUserDetails');
 const { logUserVisit } = require('../modules/logUserVisit');
 const { triggerAirflowDAG } = require('../modules/triggerAirflow'); 
-
+const config = require('../modules/config');
 const express = require('express');
 const oracledb = require('oracledb');
 const bodyParser = require('body-parser');
@@ -79,41 +79,82 @@ async function executePostgresQuery(query) {
         throw new Error(`PostgreSQL query failed: ${error.message}`);
     }
 }
+// Function to retrieve a Vault token
+async function getVaultToken() {
+    const username = process.env.VAULT_USERNAME; 
+    const password = process.env.VAULT_PASSWORD;
+    const vaultLoginUrl = `${config.vaultUrl}/v1/auth/userpass/login/${username}`;
+
+    try {
+        const authResponse = await axios.post(vaultLoginUrl, { password });
+        if (authResponse.data.auth && authResponse.data.auth.client_token) {
+            return authResponse.data.auth.client_token;
+        } else {
+            throw new Error("Authentication token not found in response.");
+        }
+    } catch (error) {
+        console.error(`Failed to authenticate with Vault at ${vaultLoginUrl}:`, error);
+        throw new Error(`Failed to authenticate with Vault: ${error.message}`);
+    }
+}
+
+// Function to write credentials to the Vault
+async function writeCredentialsToVault(vaultUrl, vaultToken, vaultEnv, secretName, credentials) {
+    try {
+        const secretPath = `${vaultUrl}/v1/secret/data/${vaultEnv}/nr-data-solutions/nr-data-analytics-platform/${secretName}`;
+        const response = await axios.put(secretPath, { data: credentials }, {
+            headers: {
+                "X-Vault-Token": vaultToken,
+                "Content-Type": "application/json"
+            }
+        });
+        console.log(`Credentials for ${secretName} successfully written to Vault.`);
+        return response.data;
+    } catch (error) {
+        console.error('Failed to write credentials to Vault:', error);
+        throw new Error(`Error writing credentials to Vault: ${error.message}`);
+    }
+}
 
 // Function to insert selected table information into the ODS datatable
 async function insertIntoDatatable(tableName, applicationName, userEmail) {
-    const userQuery = 'SELECT userid FROM dapui."user" WHERE email = $1';
+    // Fetch username for the given email
+    const userQuery = 'SELECT username FROM dapui."user" WHERE email = $1';
     const userRes = await pgClient.query(userQuery, [userEmail]);
     if (userRes.rows.length === 0) {
         throw new Error('User not found.');
     }
-    const ownerUserId = userRes.rows[0].userid;
-
+    const ownerName = userRes.rows[0].username;
+    tableName = tableName.trim().toLowerCase();
+    applicationName = applicationName.trim().toLowerCase();
+    console.log(tableName);
+    console.log(applicationName);
     // Check if the entry already exists
     const checkQuery = `
     SELECT * FROM dapui.datatable
-    WHERE tablename = $1 AND applicationname = $2 AND owneruserid = $3;
+    WHERE tablename = $1 AND applicationname = $2 AND ownername = $3;
     `;
-    const checkRes = await pgClient.query(checkQuery, [tableName, applicationName, ownerUserId]);
+    const checkRes = await pgClient.query(checkQuery, [tableName, applicationName, ownerName]);
+    
     if (checkRes.rows.length > 0) {
-    console.log('Entry already exists in datatable. Skipping insertion.');
-    return; // Skip insertion because entry already exists
+        console.log('Entry already exists in datatable. Skipping insertion.');
+        return; // Skip insertion because entry already exists
     }
 
     // Insert query if no entry exists
     const insertQuery = `
-    INSERT INTO dapui.datatable (tablename, applicationname, owneruserid)
+    INSERT INTO dapui.datatable (tablename, applicationname, ownername)
     VALUES ($1, $2, $3)
     RETURNING *;
     `;
-    const insertRes = await pgClient.query(insertQuery, [tableName.toLowerCase(), applicationName, ownerUserId]);
+    const insertRes = await pgClient.query(insertQuery, [tableName.toLowerCase(), applicationName, ownerName]);
     console.log('Inserted into datatable:', insertRes.rows[0]);
 }
 
+
 //Generate a user and roles.
 const crypto = require('crypto');
-
-async function createUserAndGrantAccess(userEmail, selectedTables, schemaName, pgClient) {
+async function createUserAndGrantAccess(userEmail, selectedTables, targetSchemaName, pgClient) {
     try {
         // Retrieve username from the user table
         const userQuery = 'SELECT username FROM dapui."user" WHERE email = $1';
@@ -136,32 +177,50 @@ async function createUserAndGrantAccess(userEmail, selectedTables, schemaName, p
             console.log(`User ${username} created with a new password.`);
         } else {
             password = 'Please use same password';
-            // Update password if user exists
-            // const updatePasswordQuery = `SELECT administration.create_proxy_account('${username}', '${password}')`;
-            // await pgClient.query(updatePasswordQuery);
-            // console.log(`Password updated for existing user ${username}.`);
+        }
+
+        // Check if targetSchemaName is valid
+        if (!targetSchemaName || targetSchemaName === '""') {
+            throw new Error('Target schema name is missing or empty.');
         }
 
         // Assign the role to the proxy account using administration.grant_adhoc_role
         const roleName = 'dap_ui'; 
+        if (!roleName || !username) {
+            throw new Error('Role name or username is missing.');
+        }
         const grantRoleQuery = `SELECT administration.grant_adhoc_role('${roleName}', '${username}')`;
         await pgClient.query(grantRoleQuery);
         console.log(`Role ${roleName} granted to proxy account ${username}.`);
 
-        // Grant schema access to the role
-        const grantSchemaQuery = `GRANT USAGE ON SCHEMA "${schemaName}" TO "${roleName}"`;
+        // Ensure targetSchemaName is quoted correctly
+        const grantSchemaQuery = `GRANT USAGE ON SCHEMA ${targetSchemaName} TO "${roleName}"`;
         await pgClient.query(grantSchemaQuery);
         console.log(`Schema access granted to role ${roleName}.`);
 
         // Grant SELECT on each table in the schema
         for (const tableName of selectedTables) {
-            const grantQuery = `GRANT SELECT ON "${schemaName}"."${tableName.toLowerCase()}" TO "${username}"`;
+            if (!tableName) continue; // Skip empty table names
+            const grantQuery = `GRANT SELECT ON ${targetSchemaName}."${tableName.toLowerCase()}" TO "${username}"`;
             await pgClient.query(grantQuery);
-            console.log(`Access granted for ${username} ,'${password}'on table ${tableName.toLowerCase()} in schema ${schemaName}.`);
+            console.log(`Access granted for ${username} on table ${tableName.toLowerCase()} in schema ${targetSchemaName}.`);
+        }
+
+        // Grant ods_admin_user full access to the schema
+        const grantOdsAdminSchemaQuery = `GRANT ALL PRIVILEGES ON SCHEMA ${targetSchemaName} TO "ods_admin_user"`;
+        await pgClient.query(grantOdsAdminSchemaQuery);
+        console.log(`Full schema access granted to ods_admin_user for schema ${targetSchemaName}.`);
+
+        // Grant ALL privileges on each table to ods_admin_user
+        for (const tableName of selectedTables) {
+            if (!tableName) continue; // Skip empty table names
+            const grantOdsAdminTableQuery = `GRANT ALL PRIVILEGES ON ${targetSchemaName}."${tableName.toLowerCase()}" TO "ods_admin_user"`;
+            await pgClient.query(grantOdsAdminTableQuery);
+            console.log(`Full access granted to ods_admin_user on table ${tableName.toLowerCase()} in schema ${targetSchemaName}.`);
         }
 
         // Return user details including the password
-        return { username, password, schemaAccess: schemaName, tables: selectedTables, action: roleCheckRes.rows.length === 0 ? "created" : "updated" };
+        return { username, password, schemaAccess: targetSchemaName, tables: selectedTables, action: roleCheckRes.rows.length === 0 ? "created" : "updated" };
 
     } catch (error) {
         console.error('Failed to create user or update access:', error);
@@ -177,8 +236,8 @@ async function createUserAndGrantAccess(userEmail, selectedTables, schemaName, p
   // Main route
   router.get('/', async (req, res) => {
     try {
-        const vaultName = req.query.vaultName; // Retrieve the vaultName from the query parameters
-        applicationName = req.query.applicationName; // Retrieve the appplicationName from the query parameters
+        const vaultName = req.query.vaultName;
+        applicationName = req.query.applicationName.toLowerCase();
         console.log(applicationName);
         if (!vaultName || !applicationName) {
             return res.status(400).send('Vault name or applicatinName is required');
@@ -195,7 +254,7 @@ async function createUserAndGrantAccess(userEmail, selectedTables, schemaName, p
         // const lastName = userDetails.family_name;
 
         // connect to ODS
-        pgClient = await connectDatabase(ODSdatabase); // Connect to PostgreSQL ODS Database
+        pgClient = await connectDatabase(ODSdatabase); 
 
         // Pass the client/connection to the logging function
         await logUserVisit(userDetails, pgClient);
@@ -206,72 +265,18 @@ async function createUserAndGrantAccess(userEmail, selectedTables, schemaName, p
         console.log('granted access'); 
           // User found, access granted
           try {
-            // Fetch user details and related data
-            // const userData = await getUserDetails(email, pgClient);
-            // console.log(userData); 
-            //get ODS user application name and vault secrets
-            // if (userData && userData.vaultnames && userData.vaultnames.length > 0) {
-            //     // Use the first vault name to connect to the Oracle database
-            //     const firstVaultName = userData.vaultnames[0]; // Assuming this is the identifier or part of the connection string
-            //     console.log(firstVaultName); 
-            //     // Database configuration variables
-            //     applicationName = userData.applicationnames[0];
-            //     oracleConnection = await connectDatabase(firstVaultName); // Adjust connectDatabase function to accept dynamic identifiers if necessary
-
-            // } 
+ 
             oracleConnection = await connectDatabase(vaultName);
 
             //get application database schema name
             sourceSchemaName = useCredentials(vaultName); 
             console.log(sourceSchemaName); 
-            targetSchemaName = `test_${sourceSchemaName.toLowerCase()}_replication`;
-            //get ODS user and application information.
-            // const userQuery = await pgClient.query('SELECT userid FROM dapui."user" WHERE email = $1', [email]);
-            // if (userQuery.rows.length > 0) {
-            //     const userId = userQuery.rows[0].userid;
-            //     // Fetch related databases
-            //     const databasesQuery = await pgClient.query('SELECT databasename, applicationname, vaultname, schemaname FROM dapui."database" WHERE owneruserid = $1', [userId]);
-            //     const databases = databasesQuery.rows;
-            //     // Fetch tables for selection
-            //     const tables = await getAllTables(oracleConnection, sourceSchemaName); // Adjust accordingly
+            targetSchemaName = `${applicationName}_replication`;
+            targetSchemaName = targetSchemaName.trim().toLowerCase();
 
-            //     res.render('automation', { tables, databases });
-            // } else {
-            //     res.status(404).send('User not found.');
-            // }
-            //get tables from oracle database
             const tables = await getAllTables(oracleConnection, sourceSchemaName); 
             res.render('automation', { tables});
-            // res.render('automation', { tables, databases });
-            // let html = `
-            //     <html>
-            //     <head>
-            //         <title>Select Tables</title>
-            //         <style>
-            //             body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f9; }
-            //             h1 { color: #333; }
-            //             ul { padding: 0; }
-            //             li { list-style: none; margin-bottom: 10px; }
-            //             input[type="checkbox"] { margin-right: 10px; }
-            //             input[type="submit"] { margin-top: 20px; padding: 10px 20px; background-color: #0056b3; color: white; border: none; border-radius: 5px; cursor: pointer; }
-            //             input[type="submit"]:hover { background-color: #003580; }
-            //             form { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-            //         </style>
-            //     </head>
-            //     <body>
-            //         <h1 style="text-align: center;">Welcome to the DAP Data Extraction Tool!</h1>
-            //         <h1>Select the tables you want to extract data from.</h1>
-            //         <form action="/generate-ddl" method="post">
-            //             <ul>`;
-            // tables.forEach(table => {
-            //     html += `<li><input type="checkbox" name="tables" value="${table}">${table}</li>`;
-            // });
-            // html += `    </ul>
-            //             <input type="submit" value="Submit">
-            //         </form>
-            //     </body>
-            //     </html>`;
-            // res.send(html);
+
         } catch (error) {
             console.error('Error displaying form:', error);
             res.status(500).send('An error occurred');
@@ -298,16 +303,19 @@ router.post('/generate-ddl', async (req, res) => {
             res.status(400).send('No tables selected');
             return;
         }
-            // Ensure selectedTables is always an array
-        // if (typeof selectedTables === 'string') {
-        //     selectedTables = [selectedTables];
-        // }
+
         if (!Array.isArray(selectedTables)) {
-            selectedTables = [selectedTables]; // Convert to array if only one table is selected
+            selectedTables = [selectedTables]; 
         }
 
         const queriesToRun = [];
-
+        // Fetch username for the given email to use as ownerName
+        const userQuery = 'SELECT username FROM dapui."user" WHERE email = $1';
+        const userRes = await pgClient.query(userQuery, [userEmail]);
+        if (userRes.rows.length === 0) {
+            throw new Error('User not found.');
+        }
+        const ownerName = userRes.rows[0].username; 
         // Check and create schema if not exists
         queriesToRun.push(`CREATE SCHEMA IF NOT EXISTS ${targetSchemaName.toLowerCase()}`);
 
@@ -336,11 +344,11 @@ router.post('/generate-ddl', async (req, res) => {
                                 } else if (column.DATA_PRECISION <= 18) {
                                     columnType = 'BIGINT';
                                 } else {
-                                    columnType = 'NUMERIC'; // Use NUMERIC for very large precision numbers without any decimal places
+                                    columnType = 'NUMERIC'; 
                                 }
                             }
                         } else {
-                            columnType = 'NUMERIC'; // Default fallback for NUMBER without precision or scale
+                            columnType = 'NUMERIC'; 
                         }
                         break;
                     case 'DATE':
@@ -348,7 +356,7 @@ router.post('/generate-ddl', async (req, res) => {
                         break;
                     case 'TIMESTAMP':
                     case 'TIMESTAMP(6)':
-                        columnType = 'TIMESTAMP'; // Consider using 'TIMESTAMP WITH TIME ZONE' for TZ types
+                        columnType = 'TIMESTAMP'; 
                         break;
                     case 'CLOB':
                         columnType = 'TEXT';
@@ -363,10 +371,10 @@ router.post('/generate-ddl', async (req, res) => {
                         columnType = 'DOUBLE PRECISION';
                         break;
                     case 'MDSYS.SDO_GEOMETRY':
-                        columnType = 'geometry'; // Install PostGIS extension in ods.
+                        columnType = 'geometry'; 
                         break;
                     default:
-                        columnType = 'TEXT'; // Fallback for unrecognized types
+                        columnType = 'TEXT'; 
                 }
                 ddl += `    "${column.COLUMN_NAME.toLowerCase()}" ${columnType} ${column.NULLABLE === 'Y' ? '' : 'NOT NULL'},\n`;
             });
@@ -410,14 +418,16 @@ router.post('/generate-ddl', async (req, res) => {
             // Check if the entry exists
             const checkQuery = `SELECT * FROM ods_data_management.cdc_master_table_list WHERE source_schema_name = '${sourceSchemaName.toLowerCase()}' AND source_table_name = '${tableName.toLowerCase()}'`;
             const checkResult = await executePostgresQuery(checkQuery);
+            targetSchemaName = `${applicationName}_replication`;
+
             if (checkResult.rowCount === 0) {
                 const insertQuery = `
                     INSERT INTO ods_data_management.cdc_master_table_list (
                         application_name, source_schema_name, source_table_name, target_schema_name, target_table_name,
-                        truncate_flag, cdc_column, active_ind, replication_order, customsql_ind, replication_source
+                        truncate_flag, cdc_column, active_ind, replication_order, customsql_ind, replication_source, custodian
                     ) VALUES (
                         '${applicationName}', '${sourceSchemaName.toLowerCase()}', '${tableName.toLowerCase()}', '${targetSchemaName.toLowerCase()}', '${tableName.toLowerCase()}',
-                        'Y', 'UPDATE_DATE', 'Y', ${replicationOrder}, 'N', 'oracle_lob'
+                        'Y', 'UPDATE_DATE', 'Y', ${replicationOrder}, 'N', 'oracle_lob', '${ownerName}'
                     );
                 `;
                 await executePostgresQuery(insertQuery);
@@ -430,7 +440,7 @@ router.post('/generate-ddl', async (req, res) => {
             for (const tableName of selectedTables) {
                 await insertIntoDatatable(tableName, applicationName, userEmail);
             }
-            console.log('Tables inserted into cdc master table');
+            console.log('Tables inserted into datatable for pulled data');
            
         } catch (error) {
             console.error('Failed to process request:', error);
@@ -506,11 +516,11 @@ router.post('/generate-ddl', async (req, res) => {
         res.send(message);
          // Try to trigger the Airflow DAG
          try {
-            await triggerAirflowDAG();  // Assuming 'auto_dag_creation' is managed within the function
+            await triggerAirflowDAG();  
             console.log('DAG triggered successfully.');
         } catch (dagError) {
             console.error('Failed to trigger Airflow DAG:', dagError);
-            // Optionally, send a specific error response or take additional recovery actions
+
         }
         
     } catch (error) {

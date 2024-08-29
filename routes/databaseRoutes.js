@@ -16,7 +16,7 @@ let pgClient;  // Client for PostgreSQL ODS Database
 // Function to fetch all users
 async function getAllUsers(pgClient) {
     try {
-        return (await pgClient.query('SELECT userid, username FROM dapui.user')).rows;
+        return (await pgClient.query('SELECT DISTINCT username FROM dapui."user"')).rows;
     } catch (error) {
         console.error('Error getting users:', error);
         return [];
@@ -27,7 +27,7 @@ async function getAllUsers(pgClient) {
 router.get('/', async (req, res) => {
     pgClient = await connectDatabase(process.env.DATABASE_ODS_IN_VAULT);
     try {
-        const result = await pgClient.query('SELECT d.databaseid, d.databasename, d.applicationname, d.vaultname, d.schemaname, u.username as ownerusername FROM dapui.database d JOIN dapui.user u ON d.owneruserid = u.userid;');
+        const result = await pgClient.query('SELECT d.databaseid, d.databasename, d.applicationname, d.vaultname, d.schemaname, d.ownername FROM dapui.database d;');
         res.render('databases/list', { databases: result.rows });
     } catch (error) {
         console.error('Error getting databases', error);
@@ -43,9 +43,9 @@ router.get('/add', async (req, res) => {
 
 // Route to handle the submission of the new database form
 router.post('/add', async (req, res) => {
-    const { databasename, applicationname, vaultname, schemaname, owneruserid } = req.body;
+    const { databasename, applicationname, vaultname, schemaname, ownername } = req.body;
     try {
-        await pgClient.query('INSERT INTO dapui.database (databasename, applicationname, vaultname, schemaname, owneruserid) VALUES ($1, $2, $3, $4, $5)', [databasename, applicationname, vaultname, schemaname, owneruserid]);
+        await pgClient.query('INSERT INTO dapui.database (databasename, applicationname, vaultname, schemaname, ownername) VALUES ($1, $2, $3, $4, $5)', [databasename, applicationname, vaultname, schemaname, ownername]);
         res.redirect('/databases');
     } catch (error) {
         console.error('Error adding database', error);
@@ -56,26 +56,21 @@ router.post('/add', async (req, res) => {
 // Route to display the form for editing an existing database
 router.get('/edit/:id', async (req, res) => {
     const { id } = req.params;
-    try {
-        const users = await getAllUsers(pgClient);
-        const result = await pgClient.query('SELECT * FROM dapui.database WHERE databaseid = $1', [id]);
-        if (result.rows.length > 0) {
-            res.render('databases/edit', { database: result.rows[0], users });
-        } else {
-            res.send('Database not found.');
-        }
-    } catch (error) {
-        console.error('Error finding database', error);
-        res.send('Failed to find database.');
+    const users = await getAllUsers(pgClient);
+    const result = await pgClient.query('SELECT * FROM dapui.database WHERE databaseid = $1', [id]);
+    if (result.rows.length > 0) {
+        res.render('databases/edit', { database: result.rows[0], users });
+    } else {
+        res.send('Database not found.');
     }
 });
 
 // Route to handle the submission of the edit database form
 router.post('/edit/:id', async (req, res) => {
-    const { databasename, applicationname, vaultname, schemaname, owneruserid } = req.body;
+    const { databasename, applicationname, vaultname, schemaname, ownername } = req.body;
     const { id } = req.params;
     try {
-        await pgClient.query('UPDATE dapui.database SET databasename = $1, applicationname = $2, vaultname = $3, schemaname = $4, owneruserid = $5 WHERE databaseid = $6', [databasename, applicationname, vaultname, schemaname, owneruserid, id]);
+        await pgClient.query('UPDATE dapui.database SET databasename = $1, applicationname = $2, vaultname = $3, schemaname = $4, ownername = $5 WHERE databaseid = $6', [databasename, applicationname, vaultname, schemaname, ownername, id]);
         res.redirect('/databases');
     } catch (error) {
         console.error('Error updating database', error);

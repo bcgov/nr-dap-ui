@@ -27,7 +27,7 @@
                     <td><%= database.applicationname %></td>
                     <td><%= database.vaultname %></td>
                     <td><%= database.schemaname %></td>
-                    <td><%= database.ownerusername %></td>
+                    <td><%= database.ownername %></td>
                     <td>
                         <form method="post" action="/databases/delete/<%= database.databaseid %>" onsubmit="return confirm('Are you sure you want to delete this database?');">
                             <a href="/databases/edit/<%= database.databaseid %>" class="edit-link">Edit</a>

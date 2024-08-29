@@ -8,6 +8,8 @@ const router = express.Router();
 const os = require('os');
 const HttpsProxyAgent = require('https-proxy-agent');
 const tls = require('tls');
+const qs = require('qs');
+const msal = require('@azure/msal-node');
 // Determine the directory for uploads
 const uploadsDir = fs.existsSync('/mnt/storage') ? '/mnt/storage' : os.tmpdir();
 
@@ -36,51 +38,49 @@ const workspaceIDs = {
 };
 
 // Token retrieval for Power BI
-async function getPowerBIToken() {
-    const url = `https://login.microsoftonline.com/${process.env.TENANT_ID}/oauth2/v2.0/token`;
 
-    const params = `client_id=${process.env.CLIENT_ID}` +
-                   `&scope=https://analysis.windows.net/powerbi/api/.default` +
-                   `&client_secret=${process.env.CLIENT_SECRET}` +  // Keep client_secret as is
-                   `&grant_type=client_credentials`;              
-    const config = {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+
+// Configuration for msal client
+const config = {
+    auth: {
+        clientId: process.env.CLIENT_ID,
+        authority: `https://login.microsoftonline.com/${process.env.TENANT_ID}`,
+        clientSecret: process.env.CLIENT_SECRET
+    }
+};
+
+// Create msal client
+const cca = new msal.ConfidentialClientApplication(config);
+
+async function getPowerBIToken() {
+    const tokenRequest = {
+        scopes: ["https://analysis.windows.net/powerbi/api/.default"],
     };
 
-    // Check if running in OpenShift with a proxy
-    if (process.env.HTTPS_PROXY) {
-        const proxyAgent = new HttpsProxyAgent({
-            host: process.env.HTTPS_PROXY,
-            rejectUnauthorized: false, // Optional: skip SSL verification for proxy
-            secureOptions: tls.SSL_OP_NO_TLSv1 | tls.SSL_OP_NO_TLSv1_1 // Force TLS 1.2+
-        });
-        config.httpsAgent = proxyAgent;
-        console.log('Using proxy:', process.env.HTTPS_PROXY);
-    }
-
-    // Log the request parameters for debugging
-    console.log('Request params:', params);
-
     try {
-        const response = await axios.post(url, params, config);
-        return response.data.access_token;
+        const response = await cca.acquireTokenByClientCredential(tokenRequest);
+        console.log('Token retrieved successfully:', response.accessToken);
+        return {
+            accessToken: response.accessToken,
+            expiresIn: response.expiresOn
+        };
     } catch (error) {
-        console.error('Failed to retrieve Power BI token:', error.response ? error.response.data : error.message);
-
+        console.error('Error acquiring Power BI token:', error);
+        
+        // If the error is due to a response from the server, log the details
         if (error.response) {
             console.error('Response status:', error.response.status);
-            console.error('Response headers:', error.response.headers);
-            console.error('Response data:', error.response.data);
-        } else {
-            console.error('Error message:', error.message);
+            console.error('Error details:', error.response.data);
         }
-
-        console.error('Full error:', error.toJSON());
-        throw new Error('Failed to retrieve Power BI token');
     }
 }
 
-// Helper function to fetch dataset users
+
+
+
+
+
+//fetch dataset users
 async function getDatasetReadUsers(workspaceId, datasetId, token) {
     const url = `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/datasets/${datasetId}/users`;
     const headers = {
@@ -101,29 +101,59 @@ async function getDatasetReadUsers(workspaceId, datasetId, token) {
 // Retrieve report details using file name
 async function getReportDetails(workspaceId, token, fileName) {
     const url = `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/reports`;
-    const headers = { Authorization: `Bearer ${token}` };
-    const response = await axios.get(url, { headers });
-    const reports = response.data.value;
-    const report = reports.find(r => r.name === fileName.replace('.pbix', ''));
-    if (report) {
-        console.log('report found');
-        return report;
-    } else {
-        throw new Error('Report not found');
+    const headers = { Authorization: `Bearer ${token.accessToken}` }; // Ensure token usage is correct
+
+    try {
+        const response = await axios.get(url, { headers });
+        const reports = response.data.value;
+        const report = reports.find(r => r.name === fileName.replace('.pbix', ''));
+        if (report) {
+            console.log('Report found:', report);
+            return report;
+        } else {
+            console.log('Report not found for file:', fileName);
+            throw new Error('Report not found');
+        }
+    } catch (error) {
+        console.error('Failed to retrieve report details:', error);
+        if (error.response) {
+            console.error('Response status:', error.response.status);
+            console.error('Response data:', error.response.data);
+        }
+        throw error; // Ensure this error is rethrown for higher-level handling
     }
 }
 
+
 // Publish to Power BI
+
+
 async function publishToPowerBI(filePath, workspaceId, token) {
     const url = `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/imports?datasetDisplayName=${encodeURIComponent(path.basename(filePath, '.pbix'))}&nameConflict=CreateOrOverwrite`;
     const formData = new FormData();
     formData.append('file', fs.createReadStream(filePath));
-    console.log('try to publish to power bi');
-    const config = { headers: { ...formData.getHeaders(), Authorization: `Bearer ${token}` } };
-    const response = await axios.post(url, formData, config);
-    console.log('published to power bi- try to get response');
-    return response.data;
+
+    const config = {
+        headers: {
+            ...formData.getHeaders(),
+            'Authorization': `Bearer ${token.accessToken}` // Ensure the token is used correctly here
+        }
+    };
+
+    try {
+        const response = await axios.post(url, formData, config);
+        console.log('File published successfully:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('Error publishing to Power BI:', error.message);
+        if (error.response) {
+            console.error('Response status:', error.response.status);
+            console.error('Response data:', error.response.data);
+        }
+        throw error; // Rethrow to handle it in calling function
+    }
 }
+
 
 // Routes
 router.get('/', (req, res) => res.render('uploadBi'));
@@ -134,7 +164,7 @@ router.post('/upload', upload.single('pbixfile'), async (req, res) => {
     }
     const { environment } = req.body;
     const workspaceId = workspaceIDs[environment];
-    console.log('worspace ID selected');
+    console.log('workspace ID selected');
     try {
         console.log('try to get getPowerBI Token');
         const token = await getPowerBIToken();

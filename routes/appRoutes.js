@@ -1,17 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg'); // PostgreSQL client
-const { getCredentialsFromVault } = require('../modules/getCredentialsFromVault');
-const { getOracleCredentials } = require('../modules/getOracleCredentials');
-const { connectToPosgDatabase } = require('../modules/connectToPosgDatabase');
-const { connectDatabase, useCredentials } = require('../modules/connectDatabase');
-// const config = require('./config.json');
-const { connectToOracleDatabase } = require('../modules/connectToOracleDatabase');
-const { verifyUserEmail } = require('../modules/verifyUserEmail');
-const { getUserDetails } = require('../modules/getUserDetails');
-const { logUserVisit } = require('../modules/logUserVisit');
-let pgClient;  // Client for PostgreSQL ODS Database
-
+const { connectDatabase } = require('../modules/connectDatabase');
 
 const getApplications = async (email) => {
     const client = await connectDatabase(process.env.DATABASE_ODS_IN_VAULT);
@@ -41,10 +30,9 @@ const getApplications = async (email) => {
     } else {
         // Non-admin users see only entries where they are the owner
         query = `
-            SELECT d.applicationname, d.vaultname 
-            FROM dapui."database" d
-            JOIN dapui."user" u ON d.owneruserid = u.userid 
-            WHERE u.email = $1
+            SELECT applicationname, vaultname 
+            FROM dapui."database"
+            WHERE ownername = (SELECT username FROM dapui."user" WHERE email = $1)
         `;
         params = [email];
     }
@@ -60,12 +48,8 @@ const getApplications = async (email) => {
     }
 };
 
-
-
 router.get('/', async (req, res) => {
-
     try {
-        pgClient = await connectDatabase(process.env.DATABASE_ODS_IN_VAULT);
         const userDetails = req.kauth.grant.access_token.content;
         const email = userDetails.email;
         const isAdmin = userDetails.realm_access && userDetails.realm_access.roles.includes('admin');
@@ -76,6 +60,5 @@ router.get('/', async (req, res) => {
         res.status(500).send('Failed to load applications.');
     }
 });
-
 
 module.exports = router;

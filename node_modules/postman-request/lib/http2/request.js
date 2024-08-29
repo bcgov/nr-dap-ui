@@ -42,6 +42,7 @@ class Http2Request extends EventEmitter {
     this.onClose = this.onClose.bind(this)
     this.onResponse = this.onResponse.bind(this)
     this.onEnd = this.onEnd.bind(this)
+    this.onTimeout = this.onTimeout.bind(this)
 
     this.registerListeners = this.registerListeners.bind(this)
     this._flushHeaders = this._flushHeaders.bind(this)
@@ -102,6 +103,7 @@ class Http2Request extends EventEmitter {
     this.stream.on('close', this.onClose)
     this.stream.on('response', this.onResponse)
     this.stream.on('end', this.onEnd)
+    this.stream.on('timeout', this.onTimeout)
   }
 
   onDrain (...args) {
@@ -120,9 +122,14 @@ class Http2Request extends EventEmitter {
     this.emit('end')
   }
 
+  onTimeout () {
+    this.stream.close()
+  }
+
   onClose (...args) {
     if (this.stream.rstCode) {
       // Emit error message in case of abnormal stream closure
+      // It is fine if the error is emitted multiple times, since the callback has checks to prevent multiple invocations
       this.onError(new Error(`HTTP/2 Stream closed with error code ${rstErrorCodesMap[this.stream.rstCode]}`))
     }
 
@@ -134,6 +141,7 @@ class Http2Request extends EventEmitter {
     this.stream.off('response', this.onResponse)
     this.stream.off('end', this.onEnd)
     this.stream.off('close', this.onClose)
+    this.stream.off('timeout', this.onTimeout)
 
     this.removeAllListeners()
   }
