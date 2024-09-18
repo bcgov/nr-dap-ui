@@ -113,7 +113,11 @@ app.get('/logouts', async (req, res) => {
                 console.error('Failed to close Oracle connection:', error);
             }
         }
-
+        // Reset credentials stored in the session or elsewhere
+        if (req.session.credentials) {
+            req.session.credentials = null; // Reset credentials to null
+            console.log('Reset credentials');
+        }
         // Destroy the session
         req.session.destroy(err => {
             console.log('destroy the session'); 
