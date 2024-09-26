@@ -21,16 +21,20 @@ Create a file name .env for environment variables.
 1. **Create .env file and edit it**:
    ```sh
     KEYCLOAK_SECRET=CHANG TO YOUR SECRET
-    CONFIG_BROKER_JWT=CHANG TO YOUR SECRET
+    CONFIG_BROKER_JWT=CHANG TO YOUR KEYCLOAK_SECRET
     CONFIG_VAULT_ENV=dev
+    KEYCLOAK_URL=https://dev/test/prod.loginproxy.gov.bc.ca/auth
+    AIRFLOW_USERNAME=CHANG TO YOURS
+    AIRFLOW_PASSWORD=CHANG TO YOURS	
+    DATABASE_ODS_IN_VAULT=dapui-proxy-ods-dev
+    TENANT_ID=CHANG TO YOUR POWER BI API TENANT ID
+    CLIENT_ID=CHANG TO YOUR POWER BI API CLIENT ID
+    CLIENT_SECRET=CHANG TO YOUR POWER BI API CLIENT SECRET
+    SESSION_SEC=CHANG TO YOUR ANY SESSION SECRET
+    REDIRECT_URI=CHANG TO CORRECT URL
 
-Edit the secret key. KEYCLOAK_SECRET is for SSO. CONFIG_BROKER_JWT is for vault api key. CONFIG_VAULT_ENV can be dev or prd.
 
-### Prerequisites
 
-- Node.js
-- npm (Node Package Manager)
-- Git
 
 ### Installation
 
